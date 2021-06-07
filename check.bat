@@ -39,9 +39,10 @@ if not "%ORACLE_HOME%" == "" (
  copy /y %ORACLE_HOME%\network\admin\listener.ora %~dp0log\.
  copy /y %ORACLE_HOME%\database\*pfile*.ora %~dp0log\.
 )
+reg query  "HKEY_LOCAL_MACHINE\SOFTWARE\ORACLE" /s
 tnsping localhost
 lsnrctl status
-expdp \"/ as sysdba\" full=y estimate_only=yes
+expdp \"/ as sysdba\" full=y version=11.2 estimate_only=yes
 copy /y d:\BACKUP\Export.bat %~dp0log\.
 copy /y d:\Program Files(X86)\Netcobol\reboot.bat %~dp0log\.
 call :SQL
@@ -64,6 +65,25 @@ select * from v$version;
 
 col tablespace_name for a20
 select * from dba_tablespace_usage_metrics;
+
+col tablespace_name for a20
+col file_name for a50
+select tablespace_name,file_name,autoextensible,increment_by from dba_data_files order by 1;
+
+select
+ t.tablespace_name                                       "領域名",
+ trunc(t.bytes/(1024*1024),2)                                 "総容量(MB)",
+ round((t.bytes - sum(f.bytes)) / (1024*1024),2)    "使用容量(MB)",
+ round(sum(f.bytes) / (1024*1024),2)                      "空き容量(MB)",
+ round((1-sum(f.bytes) / t.bytes)*100,2)                 "使用率(%)"
+from
+ sys.dba_free_space f
+ left outer join
+  (select tablespace_name,sum(bytes) bytes 
+    from sys.dba_data_files group by tablespace_name) t
+     on t.tablespace_name = f.tablespace_name
+group by
+ t.tablespace_name, t.bytes;
 
 col grantee for a30
 col granted_role for a30
